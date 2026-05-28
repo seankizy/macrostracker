@@ -128,17 +128,19 @@ No markdown, no backticks, no preamble. Raw JSON only.`,
   return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
-function Ring({ value, max, color, size=72, stroke=6, label, sub }) {
+function Ring({ value, max, color, size=88, stroke=6, label, sub }) {
   const r=(size-stroke*2)/2, circ=2*Math.PI*r, dash=circ*Math.min(value/max,1);
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke}/>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease"}}/>
-      </svg>
-      <div style={{textAlign:"center",marginTop:-size/2-2,marginBottom:size/2-10,position:"relative",zIndex:1}}>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color,lineHeight:1}}>{value}</div>
-        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1}}>{sub}</div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+      <div style={{position:"relative",width:size,height:size}}>
+        <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke}/>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease"}}/>
+        </svg>
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color,lineHeight:1}}>{value}</div>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:0.5}}>{sub}</div>
+        </div>
       </div>
       <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",letterSpacing:1}}>{label}</div>
     </div>
@@ -160,7 +162,7 @@ function MacroBar({ label, value, max, color }) {
   );
 }
 
-function EntryCard({ entry, onDelete }) {
+function EntryCard({ entry, onDelete, onEdit }) {
   const icon=entry.source==="voice"?"🎤":entry.source==="text"?"💬":"✏️";
   return (
     <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,animation:"slideIn 0.25s ease"}}>
@@ -174,7 +176,10 @@ function EntryCard({ entry, onDelete }) {
           ))}
         </div>
       </div>
-      <button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:18,padding:4,lineHeight:1,flexShrink:0,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#f87171"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>×</button>
+      <div style={{display:"flex",gap:4,flexShrink:0}}>
+        <button onClick={()=>onEdit(entry)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:14,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#60a5fa"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>✎</button>
+        <button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:18,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#f87171"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>×</button>
+      </div>
     </div>
   );
 }
@@ -246,86 +251,68 @@ function calcCalories(protein, carbs, fat) {
   return Math.round((parseFloat(protein)||0)*4 + (parseFloat(carbs)||0)*4 + (parseFloat(fat)||0)*9);
 }
 
-function ManualModal({ prefill, image, source, onSave, onClose }) {
-  const [form, setForm] = useState({
-    name: prefill?.name||"",
-    calories: prefill?.calories||"",
-    protein: prefill?.protein||"",
-    carbs: prefill?.carbs||"",
-    fat: prefill?.fat||"",
-  });
+function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }) {
+  const [name, setName] = useState(prefill?.name||"");
+  const [protein, setProtein] = useState(String(prefill?.protein||""));
+  const [carbs, setCarbs] = useState(String(prefill?.carbs||""));
+  const [fat, setFat] = useState(String(prefill?.fat||""));
+  const [calManual, setCalManual] = useState("");
   const [calOverride, setCalOverride] = useState(false);
 
-  function setMacro(k, v) {
-    setForm(f => {
-      const updated = {...f, [k]: v};
-      // Auto-calc calories from macros unless user manually edited cal field
-      if (!calOverride) {
-        updated.calories = calcCalories(
-          k==="protein"?v:updated.protein,
-          k==="carbs"?v:updated.carbs,
-          k==="fat"?v:updated.fat
-        );
-      }
-      return updated;
-    });
-  }
+  const autoCalories = calcCalories(protein, carbs, fat);
+  const displayCalories = calOverride ? calManual : (autoCalories > 0 ? autoCalories : "");
 
-  function setCalories(v) {
-    setCalOverride(true);
-    setForm(f => ({...f, calories: v}));
-  }
-
-  // If all macros are cleared, un-override so auto-calc kicks back in
-  function checkResetOverride(updated) {
-    if (!updated.protein && !updated.carbs && !updated.fat) setCalOverride(false);
-  }
+  function handleProtein(v) { setProtein(v); setCalOverride(false); }
+  function handleCarbs(v)   { setCarbs(v);   setCalOverride(false); }
+  function handleFat(v)     { setFat(v);     setCalOverride(false); }
+  function handleCalories(v){ setCalManual(v); setCalOverride(true); }
+  function resetToAuto()    { setCalOverride(false); setCalManual(""); }
 
   function save() {
-    if (!form.name) return;
-    const calories = calOverride ? (parseFloat(form.calories)||0) : calcCalories(form.protein, form.carbs, form.fat);
-    onSave({id:Date.now(), name:form.name, calories, protein:parseFloat(form.protein)||0, carbs:parseFloat(form.carbs)||0, fat:parseFloat(form.fat)||0, image:image||null, source:source||"manual"});
+    if (!name) return;
+    const calories = calOverride ? (parseFloat(calManual)||0) : autoCalories;
+    onSave({ id: Date.now(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: image||null, source: source||"manual" });
     onClose();
   }
-
-  const autoCalories = calcCalories(form.protein, form.carbs, form.fat);
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:110,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease",maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:16}}>{prefill?"CONFIRM MACROS":"ADD FOOD"}</div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:16}}>{editMode?"EDIT MEAL":prefill?"CONFIRM MACROS":"ADD FOOD"}</div>
         {prefill?.note&&<div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.6)"}}>🤖 {prefill.note} <span style={{color:"rgba(255,255,255,0.3)"}}>({prefill.confidence} confidence)</span></div>}
 
         {/* Food name */}
         <div style={{marginBottom:12}}>
           <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Food Name</div>
-          <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Chicken & Rice" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Chicken & Rice"
+            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
         </div>
 
-        {/* Macros row — edit these to auto-update calories */}
+        {/* Macros — editing any of these auto-updates calories */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
-          {[["Protein","protein",MACRO_COLORS.protein],["Carbs","carbs",MACRO_COLORS.carbs],["Fat","fat",MACRO_COLORS.fat]].map(([l,k,c])=>(
+          {[["Protein","protein",protein,handleProtein,MACRO_COLORS.protein],["Carbs","carbs",carbs,handleCarbs,MACRO_COLORS.carbs],["Fat","fat",fat,handleFat,MACRO_COLORS.fat]].map(([l,k,val,handler,c])=>(
             <div key={k}>
               <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:c,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l} (g)</div>
-              <input value={form[k]} onChange={e=>{setMacro(k,e.target.value);}} type="number" placeholder="0" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${c}30`,borderRadius:10,padding:"10px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+              <input value={val} onChange={e=>handler(e.target.value)} type="number" placeholder="0"
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${c}30`,borderRadius:10,padding:"10px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
             </div>
           ))}
         </div>
 
-        {/* Calories — auto-calculated, but editable */}
+        {/* Calories — auto or manual */}
         <div style={{marginBottom:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
             <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories,textTransform:"uppercase",letterSpacing:1}}>Calories (kcal)</div>
-            {!calOverride && autoCalories > 0 && <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto-calculated</div>}
-            {calOverride && <button onClick={()=>{setCalOverride(false);setForm(f=>({...f,calories:autoCalories}));}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"#60a5fa",padding:0}}>reset to auto</button>}
+            {!calOverride && autoCalories>0 && <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto-calculated</div>}
+            {calOverride && <button onClick={resetToAuto} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"#60a5fa",padding:0}}>reset to auto</button>}
           </div>
-          <input value={form.calories} onChange={e=>setCalories(e.target.value)} type="number" placeholder="0"
-            style={{width:"100%",background:calOverride?"rgba(255,255,255,0.08)":"rgba(249,115,22,0.06)",border:`1px solid ${calOverride?"rgba(255,255,255,0.15)":"rgba(249,115,22,0.25)"}`,borderRadius:10,padding:"10px 14px",color:calOverride?"#fff":MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box",transition:"all 0.2s"}}/>
+          <input value={displayCalories} onChange={e=>handleCalories(e.target.value)} type="number" placeholder="0"
+            style={{width:"100%",background:calOverride?"rgba(255,255,255,0.08)":"rgba(249,115,22,0.06)",border:`1px solid ${calOverride?"rgba(255,255,255,0.15)":"rgba(249,115,22,0.3)"}`,borderRadius:10,padding:"10px 14px",color:calOverride?"#fff":MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box",transition:"all 0.2s"}}/>
         </div>
 
         <div style={{display:"flex",gap:10}}>
           <button onClick={onClose} style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"rgba(255,255,255,0.6)",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,cursor:"pointer"}}>CANCEL</button>
-          <button onClick={save} style={{flex:2,padding:"13px",background:"#4ade80",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>LOG MEAL</button>
+          <button onClick={save} style={{flex:2,padding:"13px",background:"#4ade80",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>{editMode?"SAVE CHANGES":"LOG MEAL"}</button>
         </div>
       </div>
     </div>
@@ -439,6 +426,7 @@ export default function MacroTracker() {
   const [showAI,setShowAI]=useState(false); const [showTextVoice,setShowTextVoice]=useState(false);
   const [showManual,setShowManual]=useState(false); const [showTargets,setShowTargets]=useState(false);
   const [showRestore,setShowRestore]=useState(false);
+  const [editingEntry,setEditingEntry]=useState(null);
   const [pendingImage,setPendingImage]=useState(null); const [aiFill,setAiFill]=useState(null);
   const [pendingSource,setPendingSource]=useState("manual"); const [showAddMenu,setShowAddMenu]=useState(false);
   const fileRef=useRef(); const cameraRef=useRef();
@@ -462,7 +450,7 @@ export default function MacroTracker() {
     saveData({...allData,__targetsWorkout:w,__targetsRest:r});
   }
   function handleRestore(restoredData) {
-    const merged = { ...restoredData, ...allData }; // existing data wins on conflict
+    const merged = { ...restoredData, ...allData };
     const w = restoredData.__targetsWorkout || targetsWorkout;
     const r = restoredData.__targetsRest || targetsRest;
     setTargetsWorkout(w); setTargetsRest(r);
@@ -471,7 +459,8 @@ export default function MacroTracker() {
   }
   function addEntry(entry){persist({...allData,[today]:{...todayData,entries:[...todayEntries,entry]}});}
   function deleteEntry(id){persist({...allData,[today]:{...todayData,entries:todayEntries.filter(e=>e.id!==id)}});}
-  function deleteEntry(id){persist({...allData,[today]:{...todayData,entries:todayEntries.filter(e=>e.id!==id)}});}
+  function updateEntry(updated){persist({...allData,[today]:{...todayData,entries:todayEntries.map(e=>e.id===updated.id?updated:e)}});}
+  function startEdit(entry){setEditingEntry(entry);}
 
   function handleImage(file){if(!file)return;const r=new FileReader();r.onload=e=>{setPendingImage(e.target.result);setShowAI(true);setShowAddMenu(false);};r.readAsDataURL(file);}
   function handleAIPhotoResult(result,image){setAiFill({...result,image});setPendingSource("photo");setShowAI(false);setShowManual(true);}
@@ -521,21 +510,15 @@ export default function MacroTracker() {
           {/* Calorie ring */}
           <div style={{padding:"20px 20px 0",textAlign:"center"}}>
             <div style={{position:"relative",display:"inline-block"}}>
-              <svg width={160} height={160} style={{transform:"rotate(-90deg)"}}>
-                <circle cx={80} cy={80} r={68} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={10}/>
-                <circle cx={80} cy={80} r={68} fill="none" stroke={totals.calories>targets.calories?"#f87171":dayType==="rest"?"#60a5fa":"#f97316"} strokeWidth={10} strokeDasharray={`${Math.min(totals.calories/targets.calories,1)*2*Math.PI*68} ${2*Math.PI*68}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.6s ease"}}/>
+              <svg width={190} height={190} style={{transform:"rotate(-90deg)"}}>
+                <circle cx={95} cy={95} r={80} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={10}/>
+                <circle cx={95} cy={95} r={80} fill="none" stroke={totals.calories>targets.calories?"#f87171":dayType==="rest"?"#60a5fa":"#f97316"} strokeWidth={10} strokeDasharray={`${Math.min(totals.calories/targets.calories,1)*2*Math.PI*80} ${2*Math.PI*80}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.6s ease"}}/>
               </svg>
               <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,color:dayType==="rest"?"#60a5fa":"#f97316",lineHeight:1}}>{Math.round(totals.calories)}</div>
-                <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1}}>of {targets.calories}</div>
-                <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.25)",marginTop:2}}>{calPct}%</div>
+                <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{remaining.calories>=0?"remaining":"over target"}</div>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:42,color:remaining.calories>=0?(dayType==="rest"?"#60a5fa":"#f97316"):"#f87171",lineHeight:1}}>{Math.abs(Math.round(remaining.calories))}</div>
+                <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:2}}>{Math.round(totals.calories)} / {targets.calories} kcal</div>
               </div>
-            </div>
-            <div style={{marginTop:8}}>
-              {remaining.calories>=0
-                ?<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)"}}><span style={{color:dayType==="rest"?"#60a5fa":"#f97316",fontWeight:600}}>{Math.round(remaining.calories)}</span> kcal remaining</span>
-                :<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"#f87171"}}>{Math.abs(Math.round(remaining.calories))} kcal over target</span>
-              }
             </div>
           </div>
 
@@ -558,7 +541,7 @@ export default function MacroTracker() {
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:2,color:"rgba(255,255,255,0.4)",marginBottom:12}}>TODAY'S LOG — {todayEntries.length} MEAL{todayEntries.length!==1?"S":""}</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {todayEntries.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:"rgba(255,255,255,0.2)",fontSize:14}}>No meals logged yet. Tap + to add one.</div>}
-              {todayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={deleteEntry}/>)}
+              {todayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit}/>)}
             </div>
           </div>
         </>
@@ -584,6 +567,14 @@ export default function MacroTracker() {
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleImage(e.target.files[0])}/>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleImage(e.target.files[0])}/>
 
+      {editingEntry&&<ManualModal
+        prefill={editingEntry}
+        image={editingEntry.image}
+        source={editingEntry.source}
+        editMode={true}
+        onSave={updated=>{updateEntry({...editingEntry,...updated,id:editingEntry.id});setEditingEntry(null);}}
+        onClose={()=>setEditingEntry(null)}
+      />}
       {showRestore&&<RestoreModal onRestore={handleRestore} onClose={()=>setShowRestore(false)}/>}
       {showAI&&pendingImage&&<AIModal imageData={pendingImage} onResult={handleAIPhotoResult} onClose={()=>{setShowAI(false);setPendingImage(null);}}/>}
       {showTextVoice&&<TextVoiceModal onResult={handleTextVoiceResult} onClose={()=>setShowTextVoice(false)}/>}
