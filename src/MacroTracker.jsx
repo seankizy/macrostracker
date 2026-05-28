@@ -352,7 +352,7 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
 }
 
 function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore }) {
-  const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a)).slice(0,30);
+  const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a));
   return (
     <div style={{padding:"0 16px 100px"}}>
       <button onClick={onExport} style={{width:"100%",marginBottom:10,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
