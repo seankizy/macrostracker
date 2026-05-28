@@ -13,13 +13,10 @@ const DEFAULT_TARGETS = { calories: 2800, protein: 220, carbs: 280, fat: 80 };
 const MACRO_COLORS = { calories: "#f97316", protein: "#4ade80", carbs: "#60a5fa", fat: "#facc15" };
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
-// ── API helper — reads key from env in production ─────────────────────────────
-const getApiKey = () => {
-  try { return window.__ANTHROPIC_KEY__ || ""; } catch { return ""; }
-};
+// ── API helper — reads key from Vite env in production ────────────────────────
 const API_HEADERS = {
   "Content-Type": "application/json",
-  "x-api-key": getApiKey(),
+  "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
   "anthropic-version": "2023-06-01",
   "anthropic-dangerous-direct-browser-access": "true",
 };
