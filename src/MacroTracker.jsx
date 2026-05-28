@@ -87,7 +87,7 @@ async function estimateMacrosFromText(description) {
     method: "POST",
     headers: API_HEADERS,
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5",
       max_tokens: 1000,
       system: `You are a nutrition expert. Given a food description, return ONLY a JSON object:
 {"name":"concise food name","calories":number,"protein":number,"carbs":number,"fat":number,"confidence":"low|medium|high","note":"one-line note"}
@@ -96,6 +96,7 @@ No markdown, no backticks, no preamble. Raw JSON only.`,
     })
   });
   const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
   const text = data.content?.find(b => b.type === "text")?.text || "";
   return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
@@ -196,7 +197,7 @@ function TextVoiceModal({ onResult, onClose }) {
     if (!text.trim()) return;
     setLoading(true); setError("");
     try { onResult(await estimateMacrosFromText(text.trim())); }
-    catch { setError("Could not estimate macros. Try rephrasing or be more specific."); }
+    catch(e) { setError(e.message || "Could not estimate macros. Try rephrasing or be more specific."); }
     setLoading(false);
   }
 
@@ -262,7 +263,7 @@ function AIModal({ imageData, onResult, onClose }) {
         method: "POST",
         headers: API_HEADERS,
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          model: "claude-sonnet-4-5", max_tokens: 1000,
           system: `You are a nutrition expert. Return ONLY JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fat":0,"confidence":"low|medium|high","note":"..."}. No markdown, no backticks.`,
           messages: [{ role: "user", content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageData.split(",")[1] } },
@@ -273,7 +274,7 @@ function AIModal({ imageData, onResult, onClose }) {
       const data = await response.json();
       const text = data.content?.find(b => b.type === "text")?.text || "";
       onResult(JSON.parse(text.replace(/```json|```/g, "").trim()), imageData);
-    } catch { setError("Could not analyze image. Try again or enter manually."); }
+    } catch(e) { setError(e.message || "Could not analyze image. Try again or enter manually."); }
     setLoading(false);
   }
 
