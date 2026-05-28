@@ -39,8 +39,7 @@ function migrateData(raw) {
 function loadData() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    const migrated = migrateData(raw);
-    // Save migrated version back silently
+    const migrated = stripImages(migrateData(raw));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
     return migrated;
   } catch { return {}; }
@@ -52,8 +51,22 @@ function saveData(data) {
   localStorage.setItem(STORAGE_KEY + "_backup", json);
 }
 
+function stripImages(data) {
+  const cleaned = {};
+  Object.keys(data).forEach(k => {
+    if (k.startsWith("__")) { cleaned[k] = data[k]; return; }
+    const day = data[k];
+    if (day?.entries) {
+      cleaned[k] = { ...day, entries: day.entries.map(e => ({ ...e, image: null })) };
+    } else {
+      cleaned[k] = day;
+    }
+  });
+  return cleaned;
+}
+
 function backupData(allData, targetsWorkout, targetsRest) {
-  const payload = { ...allData, __targetsWorkout: targetsWorkout, __targetsRest: targetsRest, __exportedAt: new Date().toISOString() };
+  const payload = stripImages({ ...allData, __targetsWorkout: targetsWorkout, __targetsRest: targetsRest, __exportedAt: new Date().toISOString() });
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -69,7 +82,7 @@ function restoreData(file, onSuccess, onError) {
       // Validate it looks like macro data
       const hasData = Object.keys(parsed).some(k => !k.startsWith("__"));
       if (!hasData) throw new Error("File doesn't look like a macro backup");
-      const migrated = migrateData(parsed);
+      const migrated = migrateData(stripImages(parsed));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       onSuccess(migrated);
     } catch(err) { onError(err.message); }
@@ -274,7 +287,7 @@ function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }
   function save() {
     if (!name) return;
     const calories = calOverride ? (parseFloat(calManual)||0) : autoCalories;
-    onSave({ id: Date.now(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: image||null, source: source||"manual" });
+    onSave({ id: Date.now(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: null, source: source||"manual" });
     setTimeout(() => onClose(), 50);
   }
 
