@@ -45,7 +45,38 @@ function loadData() {
     return migrated;
   } catch { return {}; }
 }
-function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveData(data) {
+  const json = JSON.stringify(data);
+  localStorage.setItem(STORAGE_KEY, json);
+  // Always keep a rolling backup of the last known good save
+  localStorage.setItem(STORAGE_KEY + "_backup", json);
+}
+
+function backupData(allData, targetsWorkout, targetsRest) {
+  const payload = { ...allData, __targetsWorkout: targetsWorkout, __targetsRest: targetsRest, __exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `macro-backup-${todayKey()}.json`;
+  a.click();
+}
+
+function restoreData(file, onSuccess, onError) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      // Validate it looks like macro data
+      const hasData = Object.keys(parsed).some(k => !k.startsWith("__"));
+      if (!hasData) throw new Error("File doesn't look like a macro backup");
+      const migrated = migrateData(parsed);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      onSuccess(migrated);
+    } catch(err) { onError(err.message); }
+  };
+  reader.readAsText(file);
+}
+
 function sumMacros(entries) {
   return entries.reduce((acc, e) => ({
     calories: acc.calories + (e.calories || 0), protein: acc.protein + (e.protein || 0),
@@ -211,23 +242,87 @@ function AIModal({ imageData, onResult, onClose }) {
   );
 }
 
+function calcCalories(protein, carbs, fat) {
+  return Math.round((parseFloat(protein)||0)*4 + (parseFloat(carbs)||0)*4 + (parseFloat(fat)||0)*9);
+}
+
 function ManualModal({ prefill, image, source, onSave, onClose }) {
-  const [form,setForm]=useState({name:prefill?.name||"",calories:prefill?.calories||"",protein:prefill?.protein||"",carbs:prefill?.carbs||"",fat:prefill?.fat||""});
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  function save(){if(!form.name||!form.calories)return;onSave({id:Date.now(),name:form.name,calories:parseFloat(form.calories)||0,protein:parseFloat(form.protein)||0,carbs:parseFloat(form.carbs)||0,fat:parseFloat(form.fat)||0,image:image||null,source:source||"manual"});onClose();}
+  const [form, setForm] = useState({
+    name: prefill?.name||"",
+    calories: prefill?.calories||"",
+    protein: prefill?.protein||"",
+    carbs: prefill?.carbs||"",
+    fat: prefill?.fat||"",
+  });
+  const [calOverride, setCalOverride] = useState(false);
+
+  function setMacro(k, v) {
+    setForm(f => {
+      const updated = {...f, [k]: v};
+      // Auto-calc calories from macros unless user manually edited cal field
+      if (!calOverride) {
+        updated.calories = calcCalories(
+          k==="protein"?v:updated.protein,
+          k==="carbs"?v:updated.carbs,
+          k==="fat"?v:updated.fat
+        );
+      }
+      return updated;
+    });
+  }
+
+  function setCalories(v) {
+    setCalOverride(true);
+    setForm(f => ({...f, calories: v}));
+  }
+
+  // If all macros are cleared, un-override so auto-calc kicks back in
+  function checkResetOverride(updated) {
+    if (!updated.protein && !updated.carbs && !updated.fat) setCalOverride(false);
+  }
+
+  function save() {
+    if (!form.name) return;
+    const calories = calOverride ? (parseFloat(form.calories)||0) : calcCalories(form.protein, form.carbs, form.fat);
+    onSave({id:Date.now(), name:form.name, calories, protein:parseFloat(form.protein)||0, carbs:parseFloat(form.carbs)||0, fat:parseFloat(form.fat)||0, image:image||null, source:source||"manual"});
+    onClose();
+  }
+
+  const autoCalories = calcCalories(form.protein, form.carbs, form.fat);
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:110,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease",maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:16}}>{prefill?"CONFIRM MACROS":"ADD FOOD"}</div>
         {prefill?.note&&<div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.6)"}}>🤖 {prefill.note} <span style={{color:"rgba(255,255,255,0.3)"}}>({prefill.confidence} confidence)</span></div>}
-        {[["Food Name","name","text","e.g. Chicken & Rice"],["Calories (kcal)","calories","number","0"]].map(([l,k,t,p])=>(
-          <div key={k} style={{marginBottom:12}}><div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l}</div><input value={form[k]} onChange={e=>set(k,e.target.value)} type={t} placeholder={p} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/></div>
-        ))}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-          {[["Protein","protein"],["Carbs","carbs"],["Fat","fat"]].map(([l,k])=>(
-            <div key={k}><div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l} (g)</div><input value={form[k]} onChange={e=>set(k,e.target.value)} type="number" placeholder="0" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/></div>
+
+        {/* Food name */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Food Name</div>
+          <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Chicken & Rice" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+        </div>
+
+        {/* Macros row — edit these to auto-update calories */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
+          {[["Protein","protein",MACRO_COLORS.protein],["Carbs","carbs",MACRO_COLORS.carbs],["Fat","fat",MACRO_COLORS.fat]].map(([l,k,c])=>(
+            <div key={k}>
+              <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:c,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l} (g)</div>
+              <input value={form[k]} onChange={e=>{setMacro(k,e.target.value);}} type="number" placeholder="0" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${c}30`,borderRadius:10,padding:"10px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+            </div>
           ))}
         </div>
+
+        {/* Calories — auto-calculated, but editable */}
+        <div style={{marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories,textTransform:"uppercase",letterSpacing:1}}>Calories (kcal)</div>
+            {!calOverride && autoCalories > 0 && <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto-calculated</div>}
+            {calOverride && <button onClick={()=>{setCalOverride(false);setForm(f=>({...f,calories:autoCalories}));}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"#60a5fa",padding:0}}>reset to auto</button>}
+          </div>
+          <input value={form.calories} onChange={e=>setCalories(e.target.value)} type="number" placeholder="0"
+            style={{width:"100%",background:calOverride?"rgba(255,255,255,0.08)":"rgba(249,115,22,0.06)",border:`1px solid ${calOverride?"rgba(255,255,255,0.15)":"rgba(249,115,22,0.25)"}`,borderRadius:10,padding:"10px 14px",color:calOverride?"#fff":MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box",transition:"all 0.2s"}}/>
+        </div>
+
         <div style={{display:"flex",gap:10}}>
           <button onClick={onClose} style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"rgba(255,255,255,0.6)",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,cursor:"pointer"}}>CANCEL</button>
           <button onClick={save} style={{flex:2,padding:"13px",background:"#4ade80",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>LOG MEAL</button>
@@ -269,11 +364,15 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
   );
 }
 
-function HistoryView({ allData, targetsWorkout, targetsRest, onExport }) {
+function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore }) {
   const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a)).slice(0,30);
   return (
     <div style={{padding:"0 16px 100px"}}>
-      <button onClick={onExport} style={{width:"100%",marginBottom:20,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
+      <button onClick={onExport} style={{width:"100%",marginBottom:10,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        <button onClick={onBackup} style={{flex:1,padding:"11px",background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:12,color:"#f97316",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>💾 BACKUP JSON</button>
+        <button onClick={onShowRestore} style={{flex:1,padding:"11px",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,color:"#60a5fa",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>📂 RESTORE</button>
+      </div>
       {days.length===0?<div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>
         :days.map(day=>{
           const entries=allData[day]?.entries||[];
@@ -305,6 +404,32 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport }) {
   );
 }
 
+function RestoreModal({ onRestore, onClose }) {
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const fileRef = useRef();
+  function handleFile(file) {
+    if (!file) return;
+    restoreData(file,
+      (data) => { setSuccess(true); setTimeout(() => { onRestore(data); onClose(); }, 1200); },
+      (msg) => setError(msg)
+    );
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease"}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:8}}>RESTORE BACKUP</div>
+        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:24}}>Select a .json backup file to restore your data. Existing data will be preserved and merged.</div>
+        {success && <div style={{background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:16,fontFamily:"'DM Sans',sans-serif",fontSize:14,color:"#4ade80"}}>✓ Backup restored successfully!</div>}
+        {error && <div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:16,fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"#f87171"}}>{error}</div>}
+        <input ref={fileRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+        <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"14px",background:"rgba(96,165,250,0.1)",border:"1px solid rgba(96,165,250,0.3)",borderRadius:12,color:"#60a5fa",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1,marginBottom:10}}>📂 SELECT BACKUP FILE</button>
+        <button onClick={onClose} style={{width:"100%",padding:"13px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"rgba(255,255,255,0.6)",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,cursor:"pointer"}}>CANCEL</button>
+      </div>
+    </div>
+  );
+}
+
 export default function MacroTracker() {
   const [tab, setTab] = useState("today");
   const [allData, setAllData] = useState(()=>loadData());
@@ -313,6 +438,7 @@ export default function MacroTracker() {
 
   const [showAI,setShowAI]=useState(false); const [showTextVoice,setShowTextVoice]=useState(false);
   const [showManual,setShowManual]=useState(false); const [showTargets,setShowTargets]=useState(false);
+  const [showRestore,setShowRestore]=useState(false);
   const [pendingImage,setPendingImage]=useState(null); const [aiFill,setAiFill]=useState(null);
   const [pendingSource,setPendingSource]=useState("manual"); const [showAddMenu,setShowAddMenu]=useState(false);
   const fileRef=useRef(); const cameraRef=useRef();
@@ -335,7 +461,16 @@ export default function MacroTracker() {
     setTargetsWorkout(w);setTargetsRest(r);
     saveData({...allData,__targetsWorkout:w,__targetsRest:r});
   }
+  function handleRestore(restoredData) {
+    const merged = { ...restoredData, ...allData }; // existing data wins on conflict
+    const w = restoredData.__targetsWorkout || targetsWorkout;
+    const r = restoredData.__targetsRest || targetsRest;
+    setTargetsWorkout(w); setTargetsRest(r);
+    setAllData(merged);
+    saveData({ ...merged, __targetsWorkout: w, __targetsRest: r });
+  }
   function addEntry(entry){persist({...allData,[today]:{...todayData,entries:[...todayEntries,entry]}});}
+  function deleteEntry(id){persist({...allData,[today]:{...todayData,entries:todayEntries.filter(e=>e.id!==id)}});}
   function deleteEntry(id){persist({...allData,[today]:{...todayData,entries:todayEntries.filter(e=>e.id!==id)}});}
 
   function handleImage(file){if(!file)return;const r=new FileReader();r.onload=e=>{setPendingImage(e.target.result);setShowAI(true);setShowAddMenu(false);};r.readAsDataURL(file);}
@@ -380,7 +515,7 @@ export default function MacroTracker() {
       </div>
 
       {tab==="history"?(
-        <div style={{marginTop:20}}><HistoryView allData={allData} targetsWorkout={targetsWorkout} targetsRest={targetsRest} onExport={()=>exportToExcel(allData,targetsWorkout,targetsRest)}/></div>
+        <div style={{marginTop:20}}><HistoryView allData={allData} targetsWorkout={targetsWorkout} targetsRest={targetsRest} onExport={()=>exportToExcel(allData,targetsWorkout,targetsRest)} onBackup={()=>backupData(allData,targetsWorkout,targetsRest)} onShowRestore={()=>setShowRestore(true)}/></div>
       ):(
         <>
           {/* Calorie ring */}
@@ -449,6 +584,7 @@ export default function MacroTracker() {
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleImage(e.target.files[0])}/>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleImage(e.target.files[0])}/>
 
+      {showRestore&&<RestoreModal onRestore={handleRestore} onClose={()=>setShowRestore(false)}/>}
       {showAI&&pendingImage&&<AIModal imageData={pendingImage} onResult={handleAIPhotoResult} onClose={()=>{setShowAI(false);setPendingImage(null);}}/>}
       {showTextVoice&&<TextVoiceModal onResult={handleTextVoiceResult} onClose={()=>setShowTextVoice(false)}/>}
       {showManual&&<ManualModal prefill={aiFill} image={aiFill?.image||pendingImage} source={pendingSource} onSave={addEntry} onClose={()=>{setShowManual(false);setAiFill(null);setPendingImage(null);}}/>}
