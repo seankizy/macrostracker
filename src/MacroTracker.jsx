@@ -128,17 +128,20 @@ No markdown, no backticks, no preamble. Raw JSON only.`,
   return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
-function Ring({ value, max, color, size=88, stroke=6, label, sub }) {
-  const r=(size-stroke*2)/2, circ=2*Math.PI*r, dash=circ*Math.min(value/max,1);
+function Ring({ value, max, color, size=88, stroke=6, label, sub, over=false }) {
+  // Ring fills as you approach target — remaining fills the arc
+  const pct = Math.min(value / max, 1);
+  const r=(size-stroke*2)/2, circ=2*Math.PI*r, dash=circ*pct;
+  const displayColor = over ? "#f87171" : color;
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
       <div style={{position:"relative",width:size,height:size}}>
         <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke}/>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease"}}/>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={displayColor} strokeWidth={stroke} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease"}}/>
         </svg>
         <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color,lineHeight:1}}>{value}</div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:displayColor,lineHeight:1}}>{over ? "0" : value}</div>
           <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:0.5}}>{sub}</div>
         </div>
       </div>
@@ -276,8 +279,8 @@ function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }
   }
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:110,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease",maxHeight:"90vh",overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:110,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+      <div style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease",maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:16}}>{editMode?"EDIT MEAL":prefill?"CONFIRM MACROS":"ADD FOOD"}</div>
         {prefill?.note&&<div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:8,padding:"8px 12px",marginBottom:14,fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.6)"}}>🤖 {prefill.note} <span style={{color:"rgba(255,255,255,0.3)"}}>({prefill.confidence} confidence)</span></div>}
 
@@ -524,9 +527,9 @@ export default function MacroTracker() {
 
           {/* Macro rings */}
           <div style={{display:"flex",justifyContent:"space-around",padding:"20px 20px 0"}}>
-            <Ring value={Math.round(totals.protein)} max={targets.protein} color={MACRO_COLORS.protein} label="Protein" sub={`/${targets.protein}g`}/>
-            <Ring value={Math.round(totals.carbs)} max={targets.carbs} color={MACRO_COLORS.carbs} label="Carbs" sub={`/${targets.carbs}g`}/>
-            <Ring value={Math.round(totals.fat)} max={targets.fat} color={MACRO_COLORS.fat} label="Fat" sub={`/${targets.fat}g`}/>
+            <Ring value={Math.max(0,Math.round(remaining.protein))} max={targets.protein} color={MACRO_COLORS.protein} label="Protein" sub={`${Math.round(totals.protein)}/${targets.protein}g`} over={remaining.protein<0}/>
+            <Ring value={Math.max(0,Math.round(remaining.carbs))} max={targets.carbs} color={MACRO_COLORS.carbs} label="Carbs" sub={`${Math.round(totals.carbs)}/${targets.carbs}g`} over={remaining.carbs<0}/>
+            <Ring value={Math.max(0,Math.round(remaining.fat))} max={targets.fat} color={MACRO_COLORS.fat} label="Fat" sub={`${Math.round(totals.fat)}/${targets.fat}g`} over={remaining.fat<0}/>
           </div>
 
           {/* Macro bars */}
@@ -578,7 +581,7 @@ export default function MacroTracker() {
       {showRestore&&<RestoreModal onRestore={handleRestore} onClose={()=>setShowRestore(false)}/>}
       {showAI&&pendingImage&&<AIModal imageData={pendingImage} onResult={handleAIPhotoResult} onClose={()=>{setShowAI(false);setPendingImage(null);}}/>}
       {showTextVoice&&<TextVoiceModal onResult={handleTextVoiceResult} onClose={()=>setShowTextVoice(false)}/>}
-      {showManual&&<ManualModal prefill={aiFill} image={aiFill?.image||pendingImage} source={pendingSource} onSave={addEntry} onClose={()=>{setShowManual(false);setAiFill(null);setPendingImage(null);}}/>}
+      {showManual&&<ManualModal prefill={aiFill} image={aiFill?.image||pendingImage} source={pendingSource} onSave={entry=>{addEntry(entry);setShowManual(false);setAiFill(null);setPendingImage(null);}} onClose={()=>{setShowManual(false);setAiFill(null);setPendingImage(null);}}/>}
       {showTargets&&<TargetsModal targetsWorkout={targetsWorkout} targetsRest={targetsRest} onSave={persistTargets} onClose={()=>setShowTargets(false)}/>}
       {showAddMenu&&<div style={{position:"fixed",inset:0,zIndex:40}} onClick={()=>setShowAddMenu(false)}/>}
     </div>
