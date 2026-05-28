@@ -263,8 +263,8 @@ function AIModal({ imageData, onResult, onClose }) {
         method: "POST",
         headers: API_HEADERS,
         body: JSON.stringify({
-          model: "claude-sonnet-4-5", max_tokens: 1000,
-          system: `You are a nutrition expert. Return ONLY JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fat":0,"confidence":"low|medium|high","note":"..."}. No markdown, no backticks.`,
+          model: "claude-sonnet-4-5", max_tokens: 300,
+          system: `You are a nutrition expert. Return ONLY a single JSON object, nothing else: {"name":"food name","calories":0,"protein":0,"carbs":0,"fat":0,"confidence":"low|medium|high","note":"brief note"}`,
           messages: [{ role: "user", content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageData.split(",")[1] } },
             { type: "text", text: prompt }
@@ -272,8 +272,11 @@ function AIModal({ imageData, onResult, onClose }) {
         })
       });
       const data = await response.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "";
-      onResult(JSON.parse(text.replace(/```json|```/g, "").trim()), imageData);
+      if (data.error) throw new Error(data.error.message);
+      const rawText = data.content?.find(b => b.type === "text")?.text || "";
+      if (!rawText) throw new Error("Empty response from API");
+      const clean = rawText.replace(/```json|```/g, "").trim();
+      onResult(JSON.parse(clean), imageData);
     } catch(e) { setError(e.message || "Could not analyze image. Try again or enter manually."); }
     setLoading(false);
   }
