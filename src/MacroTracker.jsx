@@ -275,7 +275,7 @@ function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }
     if (!name) return;
     const calories = calOverride ? (parseFloat(calManual)||0) : autoCalories;
     onSave({ id: Date.now(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: image||null, source: source||"manual" });
-    onClose();
+    setTimeout(() => onClose(), 50);
   }
 
   return (
