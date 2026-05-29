@@ -179,13 +179,16 @@ function MacroBar({ label, value, max, color }) {
 }
 
 function EntryCard({ entry, onDelete, onEdit }) {
-  const icon=entry.source==="voice"?"🎤":entry.source==="text"?"💬":"✏️";
+  const icon=entry.source==="voice"?"🎤":entry.source==="text"?"💬":entry.source==="photo"?"📷":"✏️";
+  const timeStr = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
   return (
     <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,animation:"slideIn 0.25s ease"}}>
-      {entry.image?<img src={entry.image} alt="" style={{width:48,height:48,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
-        :<div style={{width:36,height:36,borderRadius:8,background:"rgba(255,255,255,0.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{icon}</div>}
+      <div style={{width:36,height:36,borderRadius:8,background:"rgba(255,255,255,0.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{icon}</div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:500,color:"#fff",marginBottom:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{entry.name}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:500,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,marginRight:8}}>{entry.name}</div>
+          {timeStr&&<div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)",flexShrink:0}}>{timeStr}</div>}
+        </div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           {[{k:"calories",l:"kcal",c:MACRO_COLORS.calories},{k:"protein",l:"P",c:MACRO_COLORS.protein},{k:"carbs",l:"C",c:MACRO_COLORS.carbs},{k:"fat",l:"F",c:MACRO_COLORS.fat}].map(({k,l,c})=>(
             <span key={k} style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:c}}>{Math.round(entry[k]||0)}{l!=="kcal"?"g":""} <span style={{color:"rgba(255,255,255,0.3)"}}>{l}</span></span>
@@ -287,7 +290,7 @@ function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }
   function save() {
     if (!name) return;
     const calories = calOverride ? (parseFloat(calManual)||0) : autoCalories;
-    onSave({ id: Date.now(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: null, source: source||"manual" });
+    onSave({ id: Date.now(), timestamp: new Date().toISOString(), name, calories, protein: parseFloat(protein)||0, carbs: parseFloat(carbs)||0, fat: parseFloat(fat)||0, image: null, source: source||"manual" });
     setTimeout(() => onClose(), 50);
   }
 
@@ -369,6 +372,9 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
 
 function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore }) {
   const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a));
+  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
+  const cutoff = sevenDaysAgo.toISOString().slice(0,10);
+
   return (
     <div style={{padding:"0 16px 100px"}}>
       <button onClick={onExport} style={{width:"100%",marginBottom:10,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
@@ -376,33 +382,59 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
         <button onClick={onBackup} style={{flex:1,padding:"11px",background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:12,color:"#f97316",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>💾 BACKUP JSON</button>
         <button onClick={onShowRestore} style={{flex:1,padding:"11px",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,color:"#60a5fa",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>📂 RESTORE</button>
       </div>
-      {days.length===0?<div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>
-        :days.map(day=>{
-          const entries=allData[day]?.entries||[];
-          const dayType=allData[day]?.dayType||"workout";
-          const tgt=dayType==="rest"?targetsRest:targetsWorkout;
-          const t=sumMacros(entries);
-          const isToday=day===todayKey();
-          return (
-            <div key={day} style={{marginBottom:16}}>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-                <span>{isToday?"TODAY":new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase()}</span>
-                <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:dayType==="rest"?"rgba(96,165,250,0.15)":"rgba(249,115,22,0.15)",color:dayType==="rest"?"#60a5fa":"#f97316",border:`1px solid ${dayType==="rest"?"rgba(96,165,250,0.3)":"rgba(249,115,22,0.3)"}`}}>{dayType==="rest"?"REST":"TRAINING"}</span>
+
+      {days.length===0 && <div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>}
+
+      {days.map(day=>{
+        const entries=allData[day]?.entries||[];
+        const dayType=allData[day]?.dayType||"workout";
+        const tgt=dayType==="rest"?targetsRest:targetsWorkout;
+        const t=sumMacros(entries);
+        const isToday=day===todayKey();
+        const isDetailed = day >= cutoff;
+        const dateLabel = isToday?"TODAY":new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+
+        return (
+          <div key={day} style={{marginBottom:16}}>
+            {/* Date header */}
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+              <span>{dateLabel}</span>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:dayType==="rest"?"rgba(96,165,250,0.15)":"rgba(249,115,22,0.15)",color:dayType==="rest"?"#60a5fa":"#f97316",border:`1px solid ${dayType==="rest"?"rgba(96,165,250,0.3)":"rgba(249,115,22,0.3)"}`}}>{dayType==="rest"?"REST":"TRAINING"}</span>
+            </div>
+
+            {/* Summary bar */}
+            <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:isDetailed?12:"12px 12px 0 0",padding:"12px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:isDetailed&&entries.length>0?8:0}}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:MACRO_COLORS.calories}}>{Math.round(t.calories)} <span style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>/ {tgt.calories} kcal</span></span>
+                <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.3)"}}>{entries.length} meal{entries.length!==1?"s":""}</span>
               </div>
-              <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"14px 16px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:MACRO_COLORS.calories}}>{Math.round(t.calories)} <span style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>/ {tgt.calories} kcal</span></span>
-                  <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.3)"}}>{entries.length} meal{entries.length!==1?"s":""}</span>
-                </div>
-                <div style={{display:"flex",gap:16}}>
-                  {[{k:"protein",l:"Protein"},{k:"carbs",l:"Carbs"},{k:"fat",l:"Fat"}].map(({k,l})=>(
-                    <div key={k}><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:MACRO_COLORS[k]}}>{Math.round(t[k])}g</div><div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)",textTransform:"uppercase",letterSpacing:1}}>{l}</div></div>
-                  ))}
-                </div>
+              <div style={{display:"flex",gap:16}}>
+                {[{k:"protein",l:"Protein"},{k:"carbs",l:"Carbs"},{k:"fat",l:"Fat"}].map(({k,l})=>(
+                  <div key={k}><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:MACRO_COLORS[k]}}>{Math.round(t[k])}g</div><div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)",textTransform:"uppercase",letterSpacing:1}}>{l}</div></div>
+                ))}
               </div>
             </div>
-          );
-        })}
+
+            {/* Meal detail — only last 7 days */}
+            {isDetailed && entries.length>0 && (
+              <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                {entries.map(e=>{
+                  const timeStr = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
+                  const icon=e.source==="voice"?"🎤":e.source==="text"?"💬":e.source==="photo"?"📷":"✏️";
+                  return (
+                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                      <span style={{fontSize:12,flexShrink:0}}>{icon}</span>
+                      <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.7)",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.name}</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:MACRO_COLORS.calories,flexShrink:0}}>{Math.round(e.calories||0)}</span>
+                      {timeStr&&<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.25)",flexShrink:0}}>{timeStr}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
