@@ -422,11 +422,20 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
                   const timeStr = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
                   const icon=e.source==="voice"?"🎤":e.source==="text"?"💬":e.source==="photo"?"📷":"✏️";
                   return (
-                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                      <span style={{fontSize:12,flexShrink:0}}>{icon}</span>
-                      <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.7)",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.name}</span>
-                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:MACRO_COLORS.calories,flexShrink:0}}>{Math.round(e.calories||0)}</span>
-                      {timeStr&&<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.25)",flexShrink:0}}>{timeStr}</span>}
+                    <div key={e.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                      <span style={{fontSize:12,flexShrink:0,marginTop:2}}>{icon}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,marginRight:8}}>{e.name}</span>
+                          {timeStr&&<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.25)",flexShrink:0}}>{timeStr}</span>}
+                        </div>
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories}}>{Math.round(e.calories||0)} <span style={{color:"rgba(255,255,255,0.3)"}}>kcal</span></span>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.protein}}>{Math.round(e.protein||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>P</span></span>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.carbs}}>{Math.round(e.carbs||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>C</span></span>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.fat}}>{Math.round(e.fat||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>F</span></span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
