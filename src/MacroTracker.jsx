@@ -178,9 +178,17 @@ function MacroBar({ label, value, max, color }) {
   );
 }
 
-function EntryCard({ entry, onDelete, onEdit }) {
+function EntryCard({ entry, onDelete, onEdit, onLogAgain }) {
+  const [flash, setFlash] = useState(false);
   const icon=entry.source==="voice"?"🎤":entry.source==="text"?"💬":entry.source==="photo"?"📷":"✏️";
   const timeStr = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
+
+  function handleLogAgain() {
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1200);
+    onLogAgain(entry);
+  }
+
   return (
     <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,animation:"slideIn 0.25s ease"}}>
       <div style={{width:36,height:36,borderRadius:8,background:"rgba(255,255,255,0.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{icon}</div>
@@ -195,7 +203,8 @@ function EntryCard({ entry, onDelete, onEdit }) {
           ))}
         </div>
       </div>
-      <div style={{display:"flex",gap:4,flexShrink:0}}>
+      <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
+        <button onClick={handleLogAgain} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:flash?"#4ade80":"rgba(249,115,22,0.15)",color:flash?"#000":"#f97316",fontSize:flash?12:18,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>{flash?"✓":"+"}</button>
         <button onClick={()=>onEdit(entry)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:14,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#60a5fa"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>✎</button>
         <button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:18,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#f87171"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>×</button>
       </div>
@@ -370,10 +379,17 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
   );
 }
 
-function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore }) {
+function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore, onLogAgain }) {
+  const [flash, setFlash] = useState(null);
   const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a));
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
   const cutoff = sevenDaysAgo.toISOString().slice(0,10);
+
+  function handleLogAgain(e) {
+    setFlash(e.id);
+    setTimeout(() => setFlash(null), 1200);
+    onLogAgain(e);
+  }
 
   return (
     <div style={{padding:"0 16px 100px"}}>
@@ -393,18 +409,14 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
         const isToday=day===todayKey();
         const isDetailed = day >= cutoff;
         const dateLabel = isToday?"TODAY":new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
-
         return (
           <div key={day} style={{marginBottom:16}}>
-            {/* Date header */}
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
               <span>{dateLabel}</span>
               <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:dayType==="rest"?"rgba(96,165,250,0.15)":"rgba(249,115,22,0.15)",color:dayType==="rest"?"#60a5fa":"#f97316",border:`1px solid ${dayType==="rest"?"rgba(96,165,250,0.3)":"rgba(249,115,22,0.3)"}`}}>{dayType==="rest"?"REST":"TRAINING"}</span>
             </div>
-
-            {/* Summary bar */}
-            <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:isDetailed?12:"12px 12px 0 0",padding:"12px 16px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:isDetailed&&entries.length>0?8:0}}>
+            <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:isDetailed&&entries.length>0?"12px 12px 0 0":12,padding:"12px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:MACRO_COLORS.calories}}>{Math.round(t.calories)} <span style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>/ {tgt.calories} kcal</span></span>
                 <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.3)"}}>{entries.length} meal{entries.length!==1?"s":""}</span>
               </div>
@@ -414,19 +426,18 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
                 ))}
               </div>
             </div>
-
-            {/* Meal detail — only last 7 days */}
             {isDetailed && entries.length>0 && (
-              <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderTop:"none",borderRadius:"0 0 12px 12px",padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderTop:"none",borderRadius:"0 0 12px 12px",padding:"6px 12px",display:"flex",flexDirection:"column"}}>
                 {entries.map(e=>{
                   const timeStr = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
                   const icon=e.source==="voice"?"🎤":e.source==="text"?"💬":e.source==="photo"?"📷":"✏️";
+                  const isFlashing = flash===e.id;
                   return (
-                    <div key={e.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                      <span style={{fontSize:12,flexShrink:0,marginTop:2}}>{icon}</span>
+                    <div key={e.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 4px",borderBottom:"1px solid rgba(255,255,255,0.04)",background:isFlashing?"rgba(74,222,128,0.05)":"transparent",transition:"background 0.3s",borderRadius:6}}>
+                      <span style={{fontSize:12,flexShrink:0,marginTop:3}}>{icon}</span>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,marginRight:8}}>{e.name}</span>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.8)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,marginRight:8}}>{e.name}</span>
                           {timeStr&&<span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.25)",flexShrink:0}}>{timeStr}</span>}
                         </div>
                         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -436,6 +447,16 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
                           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.fat}}>{Math.round(e.fat||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>F</span></span>
                         </div>
                       </div>
+                      {(
+                        <button onClick={()=>handleLogAgain(e)}
+                          style={{width:30,height:30,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:2,
+                            background:isFlashing?"#4ade80":"rgba(249,115,22,0.15)",
+                            color:isFlashing?"#000":"#f97316",
+                            fontSize:isFlashing?14:20,display:"flex",alignItems:"center",justifyContent:"center",
+                            transition:"all 0.3s ease",fontWeight:"bold"}}>
+                          {isFlashing?"✓":"+"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -561,7 +582,7 @@ export default function MacroTracker() {
       </div>
 
       {tab==="history"?(
-        <div style={{marginTop:20}}><HistoryView allData={allData} targetsWorkout={targetsWorkout} targetsRest={targetsRest} onExport={()=>exportToExcel(allData,targetsWorkout,targetsRest)} onBackup={()=>backupData(allData,targetsWorkout,targetsRest)} onShowRestore={()=>setShowRestore(true)}/></div>
+        <div style={{marginTop:20}}><HistoryView allData={allData} targetsWorkout={targetsWorkout} targetsRest={targetsRest} onExport={()=>exportToExcel(allData,targetsWorkout,targetsRest)} onBackup={()=>backupData(allData,targetsWorkout,targetsRest)} onShowRestore={()=>setShowRestore(true)} onLogAgain={e=>addEntry({...e,id:Date.now(),timestamp:new Date().toISOString()})}/></div>
       ):(
         <>
           {/* Calorie ring */}
@@ -598,7 +619,7 @@ export default function MacroTracker() {
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:2,color:"rgba(255,255,255,0.4)",marginBottom:12}}>TODAY'S LOG — {todayEntries.length} MEAL{todayEntries.length!==1?"S":""}</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {todayEntries.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:"rgba(255,255,255,0.2)",fontSize:14}}>No meals logged yet. Tap + to add one.</div>}
-              {todayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit}/>)}
+              {todayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit} onLogAgain={e=>addEntry({...e,id:Date.now(),timestamp:new Date().toISOString()})}/>)}
             </div>
           </div>
         </>
