@@ -142,7 +142,6 @@ No markdown, no backticks, no preamble. Raw JSON only.`,
 }
 
 function Ring({ value, max, color, size=88, stroke=6, label, sub, over=false }) {
-  // Ring fills as you approach target — remaining fills the arc
   const pct = Math.min(value / max, 1);
   const r=(size-stroke*2)/2, circ=2*Math.PI*r, dash=circ*pct;
   const displayColor = over ? "#f87171" : color;
@@ -154,11 +153,16 @@ function Ring({ value, max, color, size=88, stroke=6, label, sub, over=false }) 
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={displayColor} strokeWidth={stroke} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s ease"}}/>
         </svg>
         <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:displayColor,lineHeight:1}}>{over ? "0" : value}</div>
-          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:0.5}}>{sub}</div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:over?16:20,color:displayColor,lineHeight:1}}>
+            {over ? `+${value}` : value}
+          </div>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:over?"rgba(248,113,113,0.7)":"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:0.5,marginTop:1}}>
+            {over ? "over" : "left"}
+          </div>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:8,color:"rgba(255,255,255,0.25)",letterSpacing:0.5}}>{sub}</div>
         </div>
       </div>
-      <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",letterSpacing:1}}>{label}</div>
+      <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:over?"#f87171":displayColor,textTransform:"uppercase",letterSpacing:1,opacity:over?1:0.5}}>{label}</div>
     </div>
   );
 }
@@ -602,9 +606,9 @@ export default function MacroTracker() {
 
           {/* Macro rings */}
           <div style={{display:"flex",justifyContent:"space-around",padding:"20px 20px 0"}}>
-            <Ring value={Math.max(0,Math.round(remaining.protein))} max={targets.protein} color={MACRO_COLORS.protein} label="Protein" sub={`${Math.round(totals.protein)}/${targets.protein}g`} over={remaining.protein<0}/>
-            <Ring value={Math.max(0,Math.round(remaining.carbs))} max={targets.carbs} color={MACRO_COLORS.carbs} label="Carbs" sub={`${Math.round(totals.carbs)}/${targets.carbs}g`} over={remaining.carbs<0}/>
-            <Ring value={Math.max(0,Math.round(remaining.fat))} max={targets.fat} color={MACRO_COLORS.fat} label="Fat" sub={`${Math.round(totals.fat)}/${targets.fat}g`} over={remaining.fat<0}/>
+            <Ring value={remaining.protein<0?Math.abs(Math.round(remaining.protein)):Math.max(0,Math.round(remaining.protein))} max={targets.protein} color={MACRO_COLORS.protein} label="Protein" sub={`${Math.round(totals.protein)}/${targets.protein}g`} over={remaining.protein<0}/>
+            <Ring value={remaining.carbs<0?Math.abs(Math.round(remaining.carbs)):Math.max(0,Math.round(remaining.carbs))} max={targets.carbs} color={MACRO_COLORS.carbs} label="Carbs" sub={`${Math.round(totals.carbs)}/${targets.carbs}g`} over={remaining.carbs<0}/>
+            <Ring value={remaining.fat<0?Math.abs(Math.round(remaining.fat)):Math.max(0,Math.round(remaining.fat))} max={targets.fat} color={MACRO_COLORS.fat} label="Fat" sub={`${Math.round(totals.fat)}/${targets.fat}g`} over={remaining.fat<0}/>
           </div>
 
           {/* Macro bars */}
