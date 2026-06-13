@@ -357,26 +357,62 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
   const [formW, setFormW] = useState({...targetsWorkout});
   const [formR, setFormR] = useState({...targetsRest});
   const form = tab === "workout" ? formW : formR;
-  const setForm = tab === "workout" ? setFormW : setFormR;
+
+  function setMacro(k, v) {
+    const val = parseInt(v)||0;
+    const update = f => {
+      const updated = {...f, [k]: val};
+      // Auto-calc calories whenever protein/carbs/fat changes
+      if (k !== "calories") {
+        updated.calories = Math.round(
+          (k==="protein"?val:updated.protein)*4 +
+          (k==="carbs"?val:updated.carbs)*4 +
+          (k==="fat"?val:updated.fat)*9
+        );
+      }
+      return updated;
+    };
+    if (tab === "workout") setFormW(update);
+    else setFormR(update);
+  }
+
+  const autoCalories = Math.round((form.protein||0)*4 + (form.carbs||0)*4 + (form.fat||0)*9);
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease"}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#fff",marginBottom:16}}>DAILY TARGETS</div>
 
-        {/* Tab toggle */}
         <div style={{display:"flex",gap:8,marginBottom:20,background:"rgba(255,255,255,0.05)",borderRadius:12,padding:4}}>
           {[["workout","💪 Training"],["rest","😴 Rest"]].map(([v,l])=>(
             <button key={v} onClick={()=>setTab(v)} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,transition:"all 0.2s",background:tab===v?"#f97316":"transparent",color:tab===v?"#000":"rgba(255,255,255,0.4)"}}>{l}</button>
           ))}
         </div>
 
-        {[{k:"calories",l:"Calories (kcal)",c:MACRO_COLORS.calories},{k:"protein",l:"Protein (g)",c:MACRO_COLORS.protein},{k:"carbs",l:"Carbs (g)",c:MACRO_COLORS.carbs},{k:"fat",l:"Fat (g)",c:MACRO_COLORS.fat}].map(({k,l,c})=>(
+        {/* Macros first — calories auto-updates */}
+        {[{k:"protein",l:"Protein (g)",c:MACRO_COLORS.protein},{k:"carbs",l:"Carbs (g)",c:MACRO_COLORS.carbs},{k:"fat",l:"Fat (g)",c:MACRO_COLORS.fat}].map(({k,l,c})=>(
           <div key={k} style={{marginBottom:14}}>
             <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:c,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{l}</div>
-            <input type="number" value={form[k]} onChange={e=>setForm(f=>({...f,[k]:parseInt(e.target.value)||0}))} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${c}30`,borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+            <input type="number" value={form[k]} onChange={e=>setMacro(k,e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${c}30`,borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box"}}/>
           </div>
         ))}
+
+        {/* Calories — auto-calculated from macros, but editable */}
+        <div style={{marginBottom:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories,textTransform:"uppercase",letterSpacing:1}}>Calories (kcal)</div>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto-calculated from macros</div>
+          </div>
+          <input type="number" value={form.calories} onChange={e=>setMacro("calories",e.target.value)}
+            style={{width:"100%",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.25)",borderRadius:10,padding:"10px 14px",color:MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+          {form.calories !== autoCalories && (
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:4}}>
+              Macro math = {autoCalories} kcal · <span style={{color:"#60a5fa",cursor:"pointer"}} onClick={()=>setMacro("protein",form.protein)}>reset to auto</span>
+            </div>
+          )}
+        </div>
+
         <button onClick={()=>{onSave(formW,formR);onClose();}} style={{width:"100%",padding:"14px",background:"#f97316",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>SAVE TARGETS</button>
       </div>
     </div>
@@ -385,6 +421,7 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
 
 function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore, onLogAgain }) {
   const [flash, setFlash] = useState(null);
+  const [search, setSearch] = useState("");
   const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a));
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
   const cutoff = sevenDaysAgo.toISOString().slice(0,10);
@@ -395,17 +432,81 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
     onLogAgain(e);
   }
 
+  // When searching, show matching meals across all days
+  const searchTerm = search.trim().toLowerCase();
+  const searchResults = searchTerm ? (() => {
+    const results = [];
+    days.forEach(day => {
+      (allData[day]?.entries||[]).forEach(e => {
+        if (e.name?.toLowerCase().includes(searchTerm)) {
+          results.push({ ...e, day });
+        }
+      });
+    });
+    return results;
+  })() : null;
+
   return (
     <div style={{padding:"0 16px 100px"}}>
       <button onClick={onExport} style={{width:"100%",marginBottom:10,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
         <button onClick={onBackup} style={{flex:1,padding:"11px",background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:12,color:"#f97316",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>💾 BACKUP JSON</button>
         <button onClick={onShowRestore} style={{flex:1,padding:"11px",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,color:"#60a5fa",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>📂 RESTORE</button>
       </div>
 
-      {days.length===0 && <div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>}
+      {/* Search bar */}
+      <div style={{position:"relative",marginBottom:20}}>
+        <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:14}}>🔍</span>
+        <input
+          value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search food history…"
+          style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"11px 14px 11px 36px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}
+        />
+        {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:18,cursor:"pointer",padding:0}}>×</button>}
+      </div>
 
-      {days.map(day=>{
+      {/* Search results */}
+      {searchResults && (
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:10}}>
+            {searchResults.length} RESULT{searchResults.length!==1?"S":""} FOR "{search.toUpperCase()}"
+          </div>
+          {searchResults.length===0 && <div style={{textAlign:"center",padding:"32px 0",color:"rgba(255,255,255,0.2)",fontSize:14}}>No meals found matching that name.</div>}
+          {searchResults.map((e,i)=>{
+            const timeStr = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}) : "";
+            const dateStr = new Date(e.day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+            const icon=e.source==="voice"?"🎤":e.source==="text"?"💬":e.source==="photo"?"📷":"✏️";
+            const isFlashing = flash===e.id;
+            return (
+              <div key={`${e.id}-${i}`} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10,transition:"background 0.3s",..( isFlashing?{background:"rgba(74,222,128,0.06)",border:"1px solid rgba(74,222,128,0.2)"}:{})}}>
+                <span style={{fontSize:14,flexShrink:0,marginTop:2}}>{icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:500,color:"#fff",flex:1,marginRight:8}}>{e.name}</span>
+                    <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.25)",flexShrink:0,textAlign:"right"}}>{dateStr}{timeStr?` · ${timeStr}`:""}</span>
+                  </div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:11,color:MACRO_COLORS.calories}}>{Math.round(e.calories||0)} <span style={{color:"rgba(255,255,255,0.3)"}}>kcal</span></span>
+                    <span style={{fontSize:11,color:MACRO_COLORS.protein}}>{Math.round(e.protein||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>P</span></span>
+                    <span style={{fontSize:11,color:MACRO_COLORS.carbs}}>{Math.round(e.carbs||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>C</span></span>
+                    <span style={{fontSize:11,color:MACRO_COLORS.fat}}>{Math.round(e.fat||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>F</span></span>
+                  </div>
+                </div>
+                <button onClick={()=>handleLogAgain(e)} style={{width:30,height:30,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:2,background:isFlashing?"#4ade80":"rgba(249,115,22,0.15)",color:isFlashing?"#000":"#f97316",fontSize:isFlashing?14:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>
+                  {isFlashing?"✓":"+"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      )}
+
+      {/* Regular history — hidden when searching */}
+      {!searchResults && (
+        <div>
+          {days.length===0 && <div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>}
         const entries=allData[day]?.entries||[];
         const dayType=allData[day]?.dayType||"workout";
         const tgt=dayType==="rest"?targetsRest:targetsWorkout;
