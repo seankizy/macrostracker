@@ -398,19 +398,15 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
           </div>
         ))}
 
-        {/* Calories — auto-calculated from macros, but editable */}
+        {/* Calories — read-only, auto-calculated from macros */}
         <div style={{marginBottom:20}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
             <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories,textTransform:"uppercase",letterSpacing:1}}>Calories (kcal)</div>
-            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto-calculated from macros</div>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto from macros</div>
           </div>
-          <input type="number" value={form.calories} onChange={e=>setMacro("calories",e.target.value)}
-            style={{width:"100%",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.25)",borderRadius:10,padding:"10px 14px",color:MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box"}}/>
-          {form.calories !== autoCalories && (
-            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:4}}>
-              Macro math = {autoCalories} kcal · <span style={{color:"#60a5fa",cursor:"pointer"}} onClick={()=>setMacro("protein",form.protein)}>reset to auto</span>
-            </div>
-          )}
+          <div style={{width:"100%",background:"rgba(249,115,22,0.04)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:10,padding:"10px 14px",color:MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",boxSizing:"border-box",opacity:0.8}}>
+            {form.calories || 0}
+          </div>
         </div>
 
         <button onClick={()=>{onSave(formW,formR);onClose();}} style={{width:"100%",padding:"14px",background:"#f97316",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>SAVE TARGETS</button>
@@ -478,8 +474,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
             const icon=e.source==="voice"?"🎤":e.source==="text"?"💬":e.source==="photo"?"📷":"✏️";
             const isFlashing = flash===e.id;
             return (
-              <div key={`${e.id}-${i}`} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10,transition:"background 0.3s",..( isFlashing?{background:"rgba(74,222,128,0.06)",border:"1px solid rgba(74,222,128,0.2)"}:{})}}>
-                <span style={{fontSize:14,flexShrink:0,marginTop:2}}>{icon}</span>
+              <div key={`${e.id}-${i}`} style={{background:isFlashing?"rgba(74,222,128,0.06)":"rgba(255,255,255,0.04)",border:isFlashing?"1px solid rgba(74,222,128,0.2)":"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10,transition:"background 0.3s"}}>                <span style={{fontSize:14,flexShrink:0,marginTop:2}}>{icon}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
                     <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:500,color:"#fff",flex:1,marginRight:8}}>{e.name}</span>
@@ -507,6 +502,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
       {!searchResults && (
         <div>
           {days.length===0 && <div style={{textAlign:"center",padding:60,color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>No history yet. Start logging!</div>}
+          {days.map(day=>{
         const entries=allData[day]?.entries||[];
         const dayType=allData[day]?.dayType||"workout";
         const tgt=dayType==="rest"?targetsRest:targetsWorkout;
@@ -570,6 +566,8 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
           </div>
         );
       })}
+        </div>
+      )}
     </div>
   );
 }
