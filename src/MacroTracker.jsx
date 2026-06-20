@@ -496,8 +496,6 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
         </div>
       )}
 
-      )}
-
       {/* Regular history — hidden when searching */}
       {!searchResults && (
         <div>
