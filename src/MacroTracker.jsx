@@ -418,7 +418,7 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
 function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup, onShowRestore, onLogAgain }) {
   const [flash, setFlash] = useState(null);
   const [search, setSearch] = useState("");
-  const days=Object.keys(allData).filter(k=>!k.startsWith("__")).sort((a,b)=>b.localeCompare(a));
+  const days=Object.keys(allData).filter(k=>!k.startsWith("__") && k!==todayKey()).sort((a,b)=>b.localeCompare(a));
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
   const cutoff = sevenDaysAgo.toISOString().slice(0,10);
 
@@ -432,7 +432,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
   const searchTerm = search.trim().toLowerCase();
   const searchResults = searchTerm ? (() => {
     const results = [];
-    days.forEach(day => {
+    days.filter(d => d !== todayKey()).forEach(day => {
       (allData[day]?.entries||[]).forEach(e => {
         if (e.name?.toLowerCase().includes(searchTerm)) {
           results.push({ ...e, day });
@@ -505,9 +505,8 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
         const dayType=allData[day]?.dayType||"workout";
         const tgt=dayType==="rest"?targetsRest:targetsWorkout;
         const t=sumMacros(entries);
-        const isToday=day===todayKey();
         const isDetailed = day >= cutoff;
-        const dateLabel = isToday?"TODAY":new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+        const dateLabel = new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
         return (
           <div key={day} style={{marginBottom:16}}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
