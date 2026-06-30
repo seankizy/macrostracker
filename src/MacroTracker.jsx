@@ -652,7 +652,7 @@ export default function MacroTracker() {
 
   useEffect(()=>{
     const s=document.createElement("style");
-    s.textContent=`*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes micPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.2)!important;}::-webkit-scrollbar{width:0;}textarea{resize:none;}`;
+    s.textContent=`*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes micPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}}input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.2)!important;}::-webkit-scrollbar{width:0;}textarea{resize:none;}input,textarea,select{font-size:16px!important;}`;
     document.head.appendChild(s);
   },[]);
 
