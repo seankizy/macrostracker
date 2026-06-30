@@ -9,8 +9,11 @@ document.head.appendChild(fontLink);
 const STORAGE_KEY = "macro_tracker_v1";
 const DEFAULT_TARGETS_WORKOUT = { calories: 2800, protein: 220, carbs: 280, fat: 80 };
 const DEFAULT_TARGETS_REST    = { calories: 2300, protein: 220, carbs: 180, fat: 80 };
-const MACRO_COLORS = { calories: "#f97316", protein: "#4ade80", carbs: "#60a5fa", fat: "#facc15" };
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const MACRO_COLORS = { calories: "#ef4444", protein: "#4ade80", carbs: "#60a5fa", fat: "#facc15" };
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
 
 const API_HEADERS = {
   "Content-Type": "application/json",
@@ -208,7 +211,7 @@ function EntryCard({ entry, onDelete, onEdit, onLogAgain }) {
         </div>
       </div>
       <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
-        <button onClick={handleLogAgain} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:flash?"#4ade80":"rgba(249,115,22,0.15)",color:flash?"#000":"#f97316",fontSize:flash?12:18,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>{flash?"✓":"+"}</button>
+        <button onClick={handleLogAgain} style={{width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",background:flash?"#4ade80":"rgba(239,68,68,0.15)",color:flash?"#000":"#ef4444",fontSize:flash?12:18,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>{flash?"✓":"+"}</button>
         <button onClick={()=>onEdit(entry)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:14,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#60a5fa"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>✎</button>
         <button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.2)",fontSize:18,padding:4,lineHeight:1,transition:"color 0.2s"}} onMouseEnter={e=>e.target.style.color="#f87171"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.2)"}>×</button>
       </div>
@@ -273,7 +276,7 @@ function AIModal({ imageData, onResult, onClose }) {
         <img src={imageData} alt="" style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:12,marginBottom:16}}/>
         <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Add context (e.g. 'large portion', '200g chicken')…" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:14,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:14}}/>
         {error&&<div style={{color:"#f87171",fontSize:13,marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>{error}</div>}
-        <button onClick={analyze} disabled={loading} style={{width:"100%",padding:"14px",background:loading?"rgba(249,115,22,0.4)":"#f97316",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:loading?"not-allowed":"pointer",letterSpacing:1}}>{loading?"ANALYSING…":"ANALYSE MEAL"}</button>
+        <button onClick={analyze} disabled={loading} style={{width:"100%",padding:"14px",background:loading?"rgba(239,68,68,0.4)":"#ef4444",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:loading?"not-allowed":"pointer",letterSpacing:1}}>{loading?"ANALYSING…":"ANALYSE MEAL"}</button>
       </div>
     </div>
   );
@@ -339,7 +342,7 @@ function ManualModal({ prefill, image, source, onSave, onClose, editMode=false }
             {calOverride && <button onClick={resetToAuto} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"#60a5fa",padding:0}}>reset to auto</button>}
           </div>
           <input value={displayCalories} onChange={e=>handleCalories(e.target.value)} type="number" placeholder="0"
-            style={{width:"100%",background:calOverride?"rgba(255,255,255,0.08)":"rgba(249,115,22,0.06)",border:`1px solid ${calOverride?"rgba(255,255,255,0.15)":"rgba(249,115,22,0.3)"}`,borderRadius:10,padding:"10px 14px",color:calOverride?"#fff":MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box",transition:"all 0.2s"}}/>
+            style={{width:"100%",background:calOverride?"rgba(255,255,255,0.08)":"rgba(239,68,68,0.06)",border:`1px solid ${calOverride?"rgba(255,255,255,0.15)":"rgba(239,68,68,0.3)"}`,borderRadius:10,padding:"10px 14px",color:calOverride?"#fff":MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",outline:"none",boxSizing:"border-box",transition:"all 0.2s"}}/>
         </div>
 
         <div style={{display:"flex",gap:10}}>
@@ -385,7 +388,7 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
 
         <div style={{display:"flex",gap:8,marginBottom:20,background:"rgba(255,255,255,0.05)",borderRadius:12,padding:4}}>
           {[["workout","💪 Training"],["rest","😴 Rest"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setTab(v)} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,transition:"all 0.2s",background:tab===v?"#f97316":"transparent",color:tab===v?"#000":"rgba(255,255,255,0.4)"}}>{l}</button>
+            <button key={v} onClick={()=>setTab(v)} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,transition:"all 0.2s",background:tab===v?"#ef4444":"transparent",color:tab===v?"#000":"rgba(255,255,255,0.4)"}}>{l}</button>
           ))}
         </div>
 
@@ -404,12 +407,12 @@ function TargetsModal({ targetsWorkout, targetsRest, onSave, onClose }) {
             <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:MACRO_COLORS.calories,textTransform:"uppercase",letterSpacing:1}}>Calories (kcal)</div>
             <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(255,255,255,0.3)"}}>auto from macros</div>
           </div>
-          <div style={{width:"100%",background:"rgba(249,115,22,0.04)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:10,padding:"10px 14px",color:MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",boxSizing:"border-box",opacity:0.8}}>
+          <div style={{width:"100%",background:"rgba(239,68,68,0.04)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"10px 14px",color:MACRO_COLORS.calories,fontSize:16,fontFamily:"'Bebas Neue',sans-serif",boxSizing:"border-box",opacity:0.8}}>
             {form.calories || 0}
           </div>
         </div>
 
-        <button onClick={()=>{onSave(formW,formR);onClose();}} style={{width:"100%",padding:"14px",background:"#f97316",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>SAVE TARGETS</button>
+        <button onClick={()=>{onSave(formW,formR);onClose();}} style={{width:"100%",padding:"14px",background:"#ef4444",border:"none",borderRadius:12,color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:"pointer",letterSpacing:1}}>SAVE TARGETS</button>
       </div>
     </div>
   );
@@ -446,7 +449,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
     <div style={{padding:"0 16px 100px"}}>
       <button onClick={onExport} style={{width:"100%",marginBottom:10,padding:"13px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>⬇ EXPORT TO EXCEL</button>
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <button onClick={onBackup} style={{flex:1,padding:"11px",background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:12,color:"#f97316",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>💾 BACKUP JSON</button>
+        <button onClick={onBackup} style={{flex:1,padding:"11px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:12,color:"#ef4444",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>💾 BACKUP JSON</button>
         <button onClick={onShowRestore} style={{flex:1,padding:"11px",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,color:"#60a5fa",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,cursor:"pointer"}}>📂 RESTORE</button>
       </div>
 
@@ -487,7 +490,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
                     <span style={{fontSize:11,color:MACRO_COLORS.fat}}>{Math.round(e.fat||0)}g <span style={{color:"rgba(255,255,255,0.3)"}}>F</span></span>
                   </div>
                 </div>
-                <button onClick={()=>handleLogAgain(e)} style={{width:30,height:30,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:2,background:isFlashing?"#4ade80":"rgba(249,115,22,0.15)",color:isFlashing?"#000":"#f97316",fontSize:isFlashing?14:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>
+                <button onClick={()=>handleLogAgain(e)} style={{width:30,height:30,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:2,background:isFlashing?"#4ade80":"rgba(239,68,68,0.15)",color:isFlashing?"#000":"#ef4444",fontSize:isFlashing?14:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",fontWeight:"bold"}}>
                   {isFlashing?"✓":"+"}
                 </button>
               </div>
@@ -511,7 +514,7 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
           <div key={day} style={{marginBottom:16}}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"rgba(255,255,255,0.4)",letterSpacing:2,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
               <span>{dateLabel}</span>
-              <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:dayType==="rest"?"rgba(96,165,250,0.15)":"rgba(249,115,22,0.15)",color:dayType==="rest"?"#60a5fa":"#f97316",border:`1px solid ${dayType==="rest"?"rgba(96,165,250,0.3)":"rgba(249,115,22,0.3)"}`}}>{dayType==="rest"?"REST":"TRAINING"}</span>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:dayType==="rest"?"rgba(96,165,250,0.15)":"rgba(239,68,68,0.15)",color:dayType==="rest"?"#60a5fa":"#ef4444",border:`1px solid ${dayType==="rest"?"rgba(96,165,250,0.3)":"rgba(239,68,68,0.3)"}`}}>{dayType==="rest"?"REST":"TRAINING"}</span>
             </div>
             <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:isDetailed&&entries.length>0?"12px 12px 0 0":12,padding:"12px 16px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -548,8 +551,8 @@ function HistoryView({ allData, targetsWorkout, targetsRest, onExport, onBackup,
                       {(
                         <button onClick={()=>handleLogAgain(e)}
                           style={{width:30,height:30,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:2,
-                            background:isFlashing?"#4ade80":"rgba(249,115,22,0.15)",
-                            color:isFlashing?"#000":"#f97316",
+                            background:isFlashing?"#4ade80":"rgba(239,68,68,0.15)",
+                            color:isFlashing?"#000":"#ef4444",
                             fontSize:isFlashing?14:20,display:"flex",alignItems:"center",justifyContent:"center",
                             transition:"all 0.3s ease",fontWeight:"bold"}}>
                           {isFlashing?"✓":"+"}
@@ -660,7 +663,7 @@ export default function MacroTracker() {
       <div style={{padding:"20px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,letterSpacing:2,lineHeight:1}}>MACRO</div>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,letterSpacing:2,color:"#f97316",lineHeight:1}}>TRACKER</div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,letterSpacing:2,color:"#ef4444",lineHeight:1}}>TRACKER</div>
         </div>
         <button onClick={()=>setShowTargets(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 14px",color:"rgba(255,255,255,0.6)",fontFamily:"'DM Sans',sans-serif",fontSize:12,cursor:"pointer"}}>⚙ Targets</button>
       </div>
@@ -669,7 +672,7 @@ export default function MacroTracker() {
       <div style={{padding:"14px 20px 0"}}>
         <div style={{display:"flex",gap:8,background:"rgba(255,255,255,0.05)",borderRadius:12,padding:4}}>
           {[["workout","💪 Training Day"],["rest","😴 Rest Day"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setDayType(v)} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,transition:"all 0.2s",background:dayType===v?(v==="rest"?"#60a5fa":"#f97316"):"transparent",color:dayType===v?"#000":"rgba(255,255,255,0.4)"}}>{l}</button>
+            <button key={v} onClick={()=>setDayType(v)} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:1,transition:"all 0.2s",background:dayType===v?(v==="rest"?"#60a5fa":"#ef4444"):"transparent",color:dayType===v?"#000":"rgba(255,255,255,0.4)"}}>{l}</button>
           ))}
         </div>
       </div>
@@ -677,7 +680,7 @@ export default function MacroTracker() {
       {/* Tabs */}
       <div style={{display:"flex",padding:"12px 20px 0",gap:8}}>
         {["today","history"].map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px",borderRadius:10,background:tab===t?"rgba(249,115,22,0.15)":"rgba(255,255,255,0.04)",border:tab===t?"1px solid rgba(249,115,22,0.3)":"1px solid rgba(255,255,255,0.08)",color:tab===t?"#f97316":"rgba(255,255,255,0.4)",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,cursor:"pointer"}}>{t.toUpperCase()}</button>
+          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px",borderRadius:10,background:tab===t?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.04)",border:tab===t?"1px solid rgba(239,68,68,0.3)":"1px solid rgba(255,255,255,0.08)",color:tab===t?"#ef4444":"rgba(255,255,255,0.4)",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,cursor:"pointer"}}>{t.toUpperCase()}</button>
         ))}
       </div>
 
@@ -690,11 +693,11 @@ export default function MacroTracker() {
             <div style={{position:"relative",display:"inline-block"}}>
               <svg width={190} height={190} style={{transform:"rotate(-90deg)"}}>
                 <circle cx={95} cy={95} r={80} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={10}/>
-                <circle cx={95} cy={95} r={80} fill="none" stroke={totals.calories>targets.calories?"#f87171":dayType==="rest"?"#60a5fa":"#f97316"} strokeWidth={10} strokeDasharray={`${Math.min(totals.calories/targets.calories,1)*2*Math.PI*80} ${2*Math.PI*80}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.6s ease"}}/>
+                <circle cx={95} cy={95} r={80} fill="none" stroke={totals.calories>targets.calories?"#f87171":dayType==="rest"?"#60a5fa":"#ef4444"} strokeWidth={10} strokeDasharray={`${Math.min(totals.calories/targets.calories,1)*2*Math.PI*80} ${2*Math.PI*80}`} strokeLinecap="round" style={{transition:"stroke-dasharray 0.6s ease"}}/>
               </svg>
               <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
                 <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{remaining.calories>=0?"remaining":"over target"}</div>
-                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:42,color:remaining.calories>=0?(dayType==="rest"?"#60a5fa":"#f97316"):"#f87171",lineHeight:1}}>{Math.abs(Math.round(remaining.calories))}</div>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:42,color:remaining.calories>=0?(dayType==="rest"?"#60a5fa":"#ef4444"):"#f87171",lineHeight:1}}>{Math.abs(Math.round(remaining.calories))}</div>
                 <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:2}}>{Math.round(totals.calories)} / {targets.calories} kcal</div>
               </div>
             </div>
@@ -739,7 +742,7 @@ export default function MacroTracker() {
             ))}
           </div>
         )}
-        <button onClick={()=>setShowAddMenu(m=>!m)} style={{width:56,height:56,borderRadius:"50%",background:showAddMenu?"#fff":"#f97316",border:"none",cursor:"pointer",fontSize:26,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 24px rgba(249,115,22,0.4)",transition:"background 0.2s,transform 0.2s",transform:showAddMenu?"rotate(45deg)":"none",color:"#000"}}>+</button>
+        <button onClick={()=>setShowAddMenu(m=>!m)} style={{width:56,height:56,borderRadius:"50%",background:showAddMenu?"#fff":"#ef4444",border:"none",cursor:"pointer",fontSize:26,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 24px rgba(239,68,68,0.4)",transition:"background 0.2s,transform 0.2s",transform:showAddMenu?"rotate(45deg)":"none",color:"#000"}}>+</button>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleImage(e.target.files[0])}/>
