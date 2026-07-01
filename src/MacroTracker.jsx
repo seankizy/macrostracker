@@ -23,18 +23,21 @@ const API_HEADERS = {
 };
 
 function migrateData(raw) {
-  // Migrate any day that has entries as a plain array (old format) to new format
-  const migrated = { ...raw };
-  Object.keys(migrated).forEach(k => {
-    if (k.startsWith("__")) return;
-    const day = migrated[k];
-    // Old format: { entries: [...] } — missing dayType
-    if (day && day.entries && !day.dayType) {
-      migrated[k] = { entries: day.entries, dayType: "workout" };
-    }
-    // Very old format: direct array
+  const migrated = {};
+  Object.keys(raw).forEach(k => {
+    if (k.startsWith("__")) { migrated[k] = raw[k]; return; }
+    const day = raw[k];
+    // Handle all possible formats
     if (Array.isArray(day)) {
+      // Very old format: entries stored directly as array
       migrated[k] = { entries: day, dayType: "workout" };
+    } else if (day && typeof day === "object") {
+      // Ensure entries is always an array
+      const entries = Array.isArray(day.entries) ? day.entries : [];
+      migrated[k] = { entries, dayType: day.dayType || "workout" };
+    } else {
+      // Fallback for any other unexpected format
+      migrated[k] = { entries: [], dayType: "workout" };
     }
   });
   return migrated;
@@ -889,6 +892,7 @@ export default function MacroTracker() {
         onClose={()=>setEditingEntry(null)}
       />}
       {showRestore&&<RestoreModal onRestore={handleRestore} onClose={()=>setShowRestore(false)}/>}
+      {showChef&&<MacroChefModal remaining={remaining} onResult={r=>{setAiFill(r);setPendingSource("text");setShowChef(false);setShowManual(true);}} onClose={()=>setShowChef(false)}/>}
       {showAI&&pendingImage&&<AIModal imageData={pendingImage} onResult={handleAIPhotoResult} onClose={()=>{setShowAI(false);setPendingImage(null);}}/>}
       {showTextVoice&&<TextVoiceModal onResult={handleTextVoiceResult} onClose={()=>setShowTextVoice(false)}/>}
       {showManual&&<ManualModal prefill={aiFill} image={aiFill?.image||pendingImage} source={pendingSource} onSave={entry=>{addEntry(entry);setShowManual(false);setAiFill(null);setPendingImage(null);}} onClose={()=>{setShowManual(false);setAiFill(null);setPendingImage(null);}}/>}
