@@ -254,6 +254,137 @@ function TextVoiceModal({ onResult, onClose }) {
   );
 }
 
+function MacroChefModal({ remaining, onResult, onClose }) {
+  const [mode, setMode] = useState("home"); // home | kitchen | restaurant
+  const [input, setInput] = useState("");
+  const [restaurant, setRestaurant] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [response, setResponse] = useState(null);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const hasRecognition = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  function startListening() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.continuous = false; rec.interimResults = true; rec.lang = "en-US";
+    rec.onstart = () => setListening(true);
+    rec.onresult = e => setInput(Array.from(e.results).map(r => r[0].transcript).join(""));
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec; rec.start();
+  }
+
+  async function askChef() {
+    if (!input.trim()) return;
+    setLoading(true); setError(""); setResponse(null);
+    try {
+      const macroTarget = `${Math.round(remaining.calories)} kcal, ${Math.round(remaining.protein)}g protein, ${Math.round(remaining.carbs)}g carbs, ${Math.round(remaining.fat)}g fat`;
+      const prompt = mode === "kitchen"
+        ? `I need to hit these remaining macros today: ${macroTarget}. I have these ingredients available: ${input}. Suggest a meal or meals I can make that gets me as close as possible to those targets. Be practical and specific with quantities.`
+        : `I'm at ${restaurant || "a restaurant"} and need to hit these remaining macros today: ${macroTarget}. ${input ? `Menu context or preferences: ${input}.` : ""} Suggest specific menu items or ordering strategies to hit my targets as closely as possible.`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: API_HEADERS,
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5", max_tokens: 1000,
+          system: `You are a nutrition-focused personal chef. Give practical, specific meal suggestions that hit macro targets. Format your response clearly with: 1) The meal/order recommendation, 2) Estimated macros, 3) Any prep tips. Keep it concise and actionable.`,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      setResponse(data.content?.find(b => b.type === "text")?.text || "");
+    } catch(e) { setError(e.message || "Could not get suggestions. Try again."); }
+    setLoading(false);
+  }
+
+  function logSuggestion() {
+    // Open manual entry pre-filled with remaining macros as a starting point
+    onResult({ name: mode === "restaurant" ? `Meal at ${restaurant||"restaurant"}` : "Chef meal", calories: Math.max(0, remaining.calories), protein: Math.max(0, remaining.protein), carbs: Math.max(0, remaining.carbs), fat: Math.max(0, remaining.fat), confidence: "medium", note: "Pre-filled from Macro Chef — adjust as needed" });
+  }
+
+  const rem = remaining;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+      <div style={{background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,animation:"slideUp 0.3s ease",maxHeight:"90vh",overflowY:"auto"}}>
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:"#fff"}}>🍳 MACRO CHEF</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:22,cursor:"pointer",padding:4}}>×</button>
+        </div>
+        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(255,255,255,0.35)",marginBottom:16}}>Tell me what you have — I'll hit your remaining targets</div>
+
+        {/* Remaining macros display */}
+        <div style={{display:"flex",gap:8,marginBottom:18,padding:"10px 14px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)"}}>
+          {[{k:"calories",l:"kcal",c:MACRO_COLORS.calories,v:Math.round(rem.calories)},{k:"protein",l:"P",c:MACRO_COLORS.protein,v:Math.round(rem.protein)},{k:"carbs",l:"C",c:MACRO_COLORS.carbs,v:Math.round(rem.carbs)},{k:"fat",l:"F",c:MACRO_COLORS.fat,v:Math.round(rem.fat)}].map(({k,l,c,v})=>(
+            <div key={k} style={{flex:1,textAlign:"center"}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:v<0?"#f87171":c,lineHeight:1}}>{v<0?`+${Math.abs(v)}`:v}</div>
+              <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:9,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:0.5}}>{l} {v<0?"over":"left"}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mode toggle */}
+        <div style={{display:"flex",gap:8,marginBottom:18,background:"rgba(255,255,255,0.05)",borderRadius:12,padding:4}}>
+          {[["kitchen","🏠 Home Kitchen"],["restaurant","🍽 Restaurant"]].map(([v,l])=>(
+            <button key={v} onClick={()=>{setMode(v);setResponse(null);setError("");}} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",fontSize:13,letterSpacing:1,transition:"all 0.2s",background:mode===v?"#ef4444":"transparent",color:mode===v?"#fff":"rgba(255,255,255,0.4)"}}>{l}</button>
+          ))}
+        </div>
+
+        {/* Restaurant name input */}
+        {mode==="restaurant" && (
+          <div style={{marginBottom:12}}>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Restaurant Name</div>
+            <input value={restaurant} onChange={e=>setRestaurant(e.target.value)} placeholder="e.g. Chipotle, Nobu, McDonald's…"
+              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:16,fontFamily:"'DM Sans',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+        )}
+
+        {/* Main input */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
+            {mode==="kitchen"?"What ingredients do you have?":"Any preferences or menu items?"}
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <textarea value={input} onChange={e=>setInput(e.target.value)} rows={3}
+              placeholder={mode==="kitchen"?"e.g. chicken breast, rice, broccoli, olive oil…":"e.g. trying to avoid fried food, love sushi…"}
+              style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"'DM Sans',sans-serif",outline:"none",resize:"none",lineHeight:1.5}}/>
+            {hasRecognition && (
+              <button onClick={listening?()=>recognitionRef.current?.stop():startListening}
+                style={{width:52,height:52,borderRadius:"50%",border:"none",cursor:"pointer",flexShrink:0,marginTop:4,background:listening?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.08)",color:listening?"#f87171":"rgba(255,255,255,0.6)",fontSize:22,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s"}}>
+                {listening?"⏹":"🎤"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {error && <div style={{color:"#f87171",fontSize:13,marginBottom:12,fontFamily:"'DM Sans',sans-serif"}}>{error}</div>}
+
+        {/* Response */}
+        {response && (
+          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"rgba(255,255,255,0.85)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{response}</div>
+            <button onClick={logSuggestion} style={{width:"100%",marginTop:14,padding:"11px",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:10,color:"#4ade80",fontFamily:"'Bebas Neue',sans-serif",fontSize:15,letterSpacing:1,cursor:"pointer"}}>
+              ✓ LOG THIS MEAL
+            </button>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onClose} style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"rgba(255,255,255,0.6)",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,cursor:"pointer"}}>CANCEL</button>
+          <button onClick={askChef} disabled={loading} style={{flex:2,padding:"13px",background:loading?"rgba(239,68,68,0.3)":"#ef4444",border:"none",borderRadius:12,color:"#fff",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,cursor:loading?"not-allowed":"pointer",letterSpacing:1}}>
+            {loading?"THINKING…":"ASK CHEF"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AIModal({ imageData, onResult, onClose }) {
   const [note,setNote]=useState(""); const [loading,setLoading]=useState(false); const [error,setError]=useState("");
   async function analyze(){
@@ -606,7 +737,7 @@ export default function MacroTracker() {
 
   const [showAI,setShowAI]=useState(false); const [showTextVoice,setShowTextVoice]=useState(false);
   const [showManual,setShowManual]=useState(false); const [showTargets,setShowTargets]=useState(false);
-  const [showRestore,setShowRestore]=useState(false);
+  const [showRestore,setShowRestore]=useState(false); const [showChef,setShowChef]=useState(false);
   const [editingEntry,setEditingEntry]=useState(null);
   const [pendingImage,setPendingImage]=useState(null); const [aiFill,setAiFill]=useState(null);
   const [pendingSource,setPendingSource]=useState("manual"); const [showAddMenu,setShowAddMenu]=useState(false);
@@ -736,6 +867,7 @@ export default function MacroTracker() {
               {label:"📷 Take Photo",action:()=>{cameraRef.current.click();setShowAddMenu(false);}},
               {label:"🖼 Upload Photo",action:()=>{fileRef.current.click();setShowAddMenu(false);}},
               {label:"🎤 Speak / Type",action:()=>{setShowTextVoice(true);setShowAddMenu(false);}},
+              {label:"🍳 Macro Chef",action:()=>{setShowChef(true);setShowAddMenu(false);}},
               {label:"✏️ Manual Entry",action:()=>{setAiFill(null);setPendingImage(null);setShowManual(true);setShowAddMenu(false);}},
             ].map(({label,action})=>(
               <button key={label} onClick={action} style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.15)",borderRadius:24,padding:"10px 18px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:14,cursor:"pointer",whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>{label}</button>
